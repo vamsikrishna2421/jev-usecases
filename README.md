@@ -10,14 +10,14 @@ costs, and where the vendor claims don't hold up. Written to answer one question
 unreproduced. Anything tagged **(reported)** is a community self-report from launch week, not an
 independent benchmark. The [Reality check](#6-reality-check) section puts both side by side.
 
-Not affiliated with TypeSafe AI. Last updated: September 19, 2026.
+Not affiliated with TypeSafe AI. Last updated: September 20, 2026.
 
 ## Contents
 
 1. [What Jev is](#1-what-jev-is)
 2. [How it works — the three primitives](#2-how-it-works--the-three-primitives)
 3. [Five patterns worth stealing](#3-five-patterns-worth-stealing)
-4. [Use-case catalog](#4-use-case-catalog) — 12 use cases with code sketches
+4. [Use-case catalog](#4-use-case-catalog) — 17 use cases with code sketches
 5. [Cost math](#5-cost-math)
 6. [Reality check](#6-reality-check)
 7. [When NOT to use Jev](#7-when-not-to-use-jev)
@@ -141,8 +141,10 @@ compute exactly; avoid hiding several judgments inside one question.*
 
 ## 4. Use-case catalog
 
-Twelve use cases, ordered roughly by how much real-world evidence exists. Every code sketch
-follows the SDK pattern from Section 2.
+Seventeen use cases, ordered roughly by how much real-world evidence exists. Every code sketch
+follows the SDK pattern from Section 2. The original twelve were added 2026-09-19 from
+launch-week coverage (sources published Sep 15–19, 2026); entries added later carry their own
+add date and source publish date.
 
 ---
 
@@ -211,6 +213,14 @@ customer-service flow (vendor). Community: a plain-English rule engine reported 
 regulated domains, reserve it for the high-volume routing layer and escalate flagged cases
 to a model (or human) that can produce a written explanation.
 
+**New signal — added 2026-09-20.** A community BANKING77 banking-intent classification
+eval (published Sep 18, 2026) reported 92.40% accuracy vs 93.66% for a fine-tuned BERT
+(−1.26 pt) at US$0.44 total test cost; an IRS tax-document page classifier reported 261
+forms at 100% strict accuracy on the author's corpus, ~$0.001/page, self-reported 34×
+cheaper and 6× faster than the author's prior LLM pipeline — surveyed in
+[this Sep 20, 2026 finance-projects roundup](https://gist.github.com/drillan/6916b16e8ea31a8ec36c8f59d6483150)
+(reported).
+
 ---
 
 ### 4. Content moderation
@@ -264,6 +274,15 @@ and only invoked a small LLM for free-text typing — booking a real Zürich→L
 7.1 s for $0.0039 (reported). A computer-use agent drove a Mac at $0.0002 per decision vs
 $0.032 for a bare-screenshot Opus 5 call (reported). A Claude Code session was reported
 cut from ~1M tokens to 86K by routing decisions through Jev (reported).
+
+**New signal — added 2026-09-20.** Vercel's open agent framework *eve* ships Jev
+(`typesafe-ai/jev`) as the default evaluation model in its `auto()` human-in-the-loop
+tool-approval path
+([eve docs](https://github.com/vercel/eve/blob/HEAD/docs/tools/human-in-the-loop.md),
+updated Sep 17, 2026); Vercel engineer Pranit Sharma reported 5–18x faster responses vs
+ChatGPT Luna 5.6 for command safety checks with improved classification accuracy
+(reported in
+[this Sep 18, 2026 writeup](https://www.omegatechnologysolutionsgroupinc.com/blog/typesafe-ais-jev-model-chooses-actions-not-words-ca35b3)).
 
 **Sketch** — the cascade in `examples/agent_router.py`:
 
@@ -414,6 +433,128 @@ autonomous drone built in 15 minutes on $0.10 of inference; Super Mario played f
 emulator RAM translated to object-centric JSON (reported). The honest lesson from the
 computer-use build: *"every piece of reasoning the frontier model does for free has to be
 rebuilt here as deterministic state."*
+
+---
+
+### 13. Voice command interpretation → typed actions
+
+**Added 2026-09-20.** Source published Sep 17, 2026 —
+[moritzkremb/jev-voice-browser](https://github.com/moritzkremb/jev-voice-browser).
+
+**The problem.** Voice interfaces need sub-second interpretation of free speech into
+*executable* actions — intent plus target — and an LLM call adds seconds and dollars per
+utterance.
+
+**How Jev fits.** Transcribe locally, then one Jev call per utterance: a `Choice` over the
+action vocabulary plus a `Choice` over on-page targets (collected by code from the DOM),
+decided in ~300 ms per spoken word; deterministic Playwright code executes. A voice-drawing
+build reports ~350 ms per spoken word deciding action, target, and place (reported in the
+[awesome-jev directory](https://github.com/hellogumbo/awesome-jev/blob/main/README.md),
+refreshed Sep 20, 2026).
+
+**Real-world signal.** The browser build's integration suite (27 real-API cases on captured
+page fixtures, Sep 2026) passed 27/27, with Jev latency averaging ≈330 ms (p50 ≈300 ms,
+3–6k input tokens per request); a 16-command headed demo against real sites cost ≈$0.01
+(reported).
+
+Full sketch in `examples/voice_router.py`.
+
+---
+
+### 14. Semantic grep — filter lines by meaning
+
+**Added 2026-09-20.** Source published Sep 18, 2026 —
+[keltokhy/jgrep](https://github.com/keltokhy/jgrep).
+
+**The problem.** `grep` matches patterns; teams need to match *meaning* across logs,
+titles, diffs, and records — "a user is getting frustrated", "removes error handling for a
+persistent write" — work that previously needed an LLM per line.
+
+**How Jev fits.** Each line (or diff hunk, function, paragraph, CSV row) becomes one `Noul`
+question — "does this match the description?" — judged concurrently in input order. Works
+on live streams (`tail -f`) because decisions arrive in ~200 ms. Judgment quality scales
+with description quality; a `--estimate` mode previews calls and cost with no key.
+
+**Real-world signal.** Measured on 994 Hacker News titles: 4.6 seconds and $0.012 for one
+description — about 200 ms and a thousandth of a cent per line — and the same time for
+three descriptions at once (reported).
+
+Full sketch in `examples/semantic_grep.py`.
+
+---
+
+### 15. Decision-to-UI — Jev picks the interface
+
+**Added 2026-09-20.** Sources published Sep 17–19, 2026 —
+[Instinct](https://github.com/joevidev/ui-generator-instinct-jev) (repo created Sep 17,
+2026; live site ui-generator-instinct-jev.vercel.app); Chris Tate's Jev + json-render
+experiment ([video posted Sep 19, 2026](https://www.instagram.com/reel/DdeCIFxoZgL/)).
+
+**The problem.** "AI UI generators" ask a model to write code or copy and hope it's valid
+and on-brand. For dashboards, forms, and admin surfaces the UI space is really a *catalog*
+— the decision is which component or block to render and how to configure it.
+
+**How Jev fits.** Describe the case in free text; Jev never generates code. Hierarchical
+`Choice` calls pick a component family, then a leaf (48 real shadcn components / 17 page
+blocks in Instinct), then `Noul`/`Score` questions configure props and content — all from
+bounded, real option sets; code renders the winner. Zero free text anywhere in the
+pipeline except the user's own input. Confidence-gated escalation (call 3 tiebreak) only
+fires when the margin is thin.
+
+**Real-world signal.** Instinct verified live against the real Jev API across components,
+blocks, and the tiebreak/escalation path (reported; not every catalog entry individually
+visually spot-checked). A separate Sep 19 build demonstrated typed decisions rendered as
+UI in milliseconds — e.g. a London→Edinburgh train-ticket interface (reported).
+
+---
+
+### 16. Live checklist / progress tracking
+
+**Added 2026-09-20.** Source published Sep 19, 2026 —
+[finetuningsingh/intelliprompter](https://github.com/finetuningsingh/intelliprompter)
+(independent rebuild of a TypeSafe Discord town-hall demo).
+
+**The problem.** Speakers, support agents, and operators work from talking-point lists and
+need to know — in real time, in any order — what they've already covered. The original
+LLM implementation cost ~$40/hour.
+
+**How Jev fits.** Each open talking point is a `Score` question ("how much has the speaker
+covered this point?"); all open points are scored in parallel in one request every 500 ms
+against the transcript so far. Code checks a point off at threshold (1.5 default) and
+stops sending it. A passing mention can check a point off at low thresholds — tune the
+threshold per list.
+
+**Real-world signal.** With Jev the same job costs at most ~$0.50/hour (two calls/sec at
+~$0.00007 each), ~80x cheaper than the LLM version. Measured replay: a 383-word talk with
+7 points — all 6 covered points checked off, the uncovered point peaking at 0.03 (26
+calls, avg 236 ms, $0.0011 total); a 1,581-word talk — all 6 covered points checked, 106
+calls averaging 252 ms, $0.0074 (reported).
+
+Full sketch in `examples/progress_tracker.py`.
+
+---
+
+### 17. Financial news desk — trade-idea triage
+
+**Added 2026-09-20.** Source published Sep 18, 2026 —
+[0xnairb/research_desk](https://github.com/0xnairb/research_desk).
+
+**The problem.** Research desks want fast, repeatable first-pass analysis of news and
+tickers — ranked, grounded, routed trade ideas — without paying a reasoning model per
+headline.
+
+**How Jev fits.** One market snapshot → 12 independent Jev questions (trend, momentum,
+sentiment, risk, …) → an in-code rule engine (BUY gate: trend > 0.75 AND momentum > 0.70,
+…). Every number the UI shows is a typed answer from one request; thresholds, risk vetoes,
+and order placement stay deterministic. Dry-run/paper by default.
+
+**Real-world signal.** Working demo with live yfinance data, a five-stage pipeline, and a
+call-recording tab showing the exact state and questions behind every number (reported;
+thresholds are starting guesses, not values fitted to real outcomes).
+
+**Relationship to use case 11.** That section's market-making bot is hot-path, per-block
+trading; this is analyst-desk triage of news and tickers into ranked trade ideas — a
+slower, research-shaped loop.
 
 ---
 
