@@ -10,14 +10,14 @@ costs, and where the vendor claims don't hold up. Written to answer one question
 unreproduced. Anything tagged **(reported)** is a community self-report from launch week, not an
 independent benchmark. The [Reality check](#6-reality-check) section puts both side by side.
 
-Not affiliated with TypeSafe AI. Last updated: September 21, 2026.
+Not affiliated with TypeSafe AI. Last updated: September 22, 2026.
 
 ## Contents
 
 1. [What Jev is](#1-what-jev-is)
 2. [How it works — the three primitives](#2-how-it-works--the-three-primitives)
 3. [Five patterns worth stealing](#3-five-patterns-worth-stealing)
-4. [Use-case catalog](#4-use-case-catalog) — 20 use cases with code sketches
+4. [Use-case catalog](#4-use-case-catalog) — 28 use cases with code sketches
 5. [Cost math](#5-cost-math)
 6. [Reality check](#6-reality-check)
 7. [When NOT to use Jev](#7-when-not-to-use-jev)
@@ -141,7 +141,7 @@ compute exactly; avoid hiding several judgments inside one question.*
 
 ## 4. Use-case catalog
 
-Twenty use cases, ordered roughly by how much real-world evidence exists. Every code sketch
+Twenty-eight use cases, ordered roughly by how much real-world evidence exists. Every code sketch
 follows the SDK pattern from Section 2. The original twelve were added 2026-09-19 from
 launch-week coverage (sources published Sep 15–19, 2026); entries added later carry their own
 add date and source publish date.
@@ -227,6 +227,12 @@ cheaper and 6× faster than the author's prior LLM pipeline — surveyed in
 [this Sep 20, 2026 finance-projects roundup](https://gist.github.com/drillan/6916b16e8ea31a8ec36c8f59d6483150)
 (reported).
 
+**New signal — added 2026-09-22.** Formanator (98 stars) analyzes receipts and
+auto-fills benefit-claim forms using Jev as a cheaper alternative to an LLM
+classifier (reported in the
+[Jev in production tracker](https://iambraun.com/jevreports/shipped/), Sep 21, 2026;
+no cost numbers published yet).
+
 ---
 
 ### 4. Content moderation
@@ -261,6 +267,13 @@ second; an ESLint-rule checker reported 90% agreement with the rule's own verdic
 (reported). On TypeSafe's workflow eval, Jev matched GPT-5.6 Terra's agreement score
 (67.8% vs 67.9%) at ~1/76th the cost (vendor).
 
+**New signal — added 2026-09-22.** Vercel's eve ran failure-reason classification over
+320 real agent session logs — 2M tokens classified in 14 seconds for $0.08 — and
+LangChain tested Jev against LLM judges for agent evals, comparing accuracy,
+repeatability, latency, and cost (both reported in the
+[Jev in production tracker](https://iambraun.com/jevreports/shipped/), entries dated
+Sep 19 and Sep 21, 2026; primary posts not yet independently verified).
+
 ---
 
 ### 6. Agent-loop routing, tool-use guardrails & safety checks
@@ -289,6 +302,11 @@ updated Sep 17, 2026); Vercel engineer Pranit Sharma reported 5–18x faster res
 ChatGPT Luna 5.6 for command safety checks with improved classification accuracy
 (reported in
 [this Sep 18, 2026 writeup](https://www.omegatechnologysolutionsgroupinc.com/blog/typesafe-ais-jev-model-chooses-actions-not-words-ca35b3)).
+
+**New signal — added 2026-09-22.** fastbrowse — a browser agent where Jev picks each
+browser action from page candidates — claims 41/42 tasks passed at 71x lower cost than
+Browser Use in the maintainer's own benchmark (reported in the
+[Jev in production tracker](https://iambraun.com/jevreports/shipped/), Sep 21, 2026).
 
 **Sketch** — the cascade in `examples/agent_router.py`:
 
@@ -327,6 +345,13 @@ reduction, though what gets lost in pruning vs. summarization is genuinely conte
 (reported, debated). One caution from the field: a well-calibrated judgment about badly
 retrieved material is still a judgment about bad material — retrieval quality sets the
 ceiling.
+
+**New signal — added 2026-09-22.** Two agent-memory layers adopted Jev this week:
+Hippo added an opt-in Jev reranker for retrieval quality, and total-agent-memory v14.3.0
+added Jev as a contradiction checker inside `memory_answer`, flagging conflicting
+retrieved facts (reported in the
+[Jev in production tracker](https://iambraun.com/jevreports/shipped/), Sep 21, 2026;
+no independent numbers on either yet).
 
 ---
 
@@ -484,6 +509,18 @@ with description quality; a `--estimate` mode previews calls and cost with no ke
 **Real-world signal.** Measured on 994 Hacker News titles: 4.6 seconds and $0.012 for one
 description — about 200 ms and a thousandth of a cent per line — and the same time for
 three descriptions at once (reported).
+
+**New signal — added 2026-09-22.** jegrep — natural-language semantic code search with
+no index: Jev scores folders, then files, then bounded code passages, returning files
+and original line ranges. The author claims $0.01–0.03 per search across a few thousand
+files (reported in the
+[Jev in production tracker](https://iambraun.com/jevreports/shipped/), Sep 20, 2026).
+A Sep 21 dev.to review of 100+ Jev repos singled it out as the search-and-filtering
+pattern worth stealing
+([article](https://dev.to/hao_kang_82922526dfe5d934/we-read-100-jev-repositories-the-best-part-was-the-code-around-the-model-call-am3)),
+and an independent strategy benchmark measured 100% file/region recall on Postgres code
+search at $0.03453 per run for its cascade strategy vs $0.04973 for windowed
+([krabarena.com](https://krabarena.com/claims/jegrep-cascade-cut-api-cost-30-6-while-keeping-100-recall-on-postgres-search)).
 
 Full sketch in `examples/semantic_grep.py`.
 
@@ -700,6 +737,156 @@ if answers["false_positive"].noul > 0.8:
 elif answers["ir_escalation"].noul > 0.7:
     page_ir_team(alert, answers["severity"].score)
 ```
+
+---
+
+### 21. Live broadcast audience-message triage
+
+**Added 2026-09-22.** Source published Sep 21, 2026 —
+[marcemarin/radio-chat](https://github.com/marcemarin/radio-chat).
+
+**The problem.** Radio and TV shows receive thousands of WhatsApp messages during a
+broadcast — mostly voice notes nobody has time to listen to — and the producer must
+pick what goes on air in seconds.
+
+**How Jev fits.** A two-tier pipeline. Voice notes are transcribed (AssemblyAI, Deepgram,
+or OpenAI), then *every* message is classified with Jev: intent (`complaint`, `song
+request`, `greeting`, `opinion`, `contest`, `question`, `spam`), sentiment, an
+"on-air score", and moderation flags — typed decisions with calibrated probabilities in
+about a second, "for a fraction of a cent per thousand messages" (reported). Anything
+needing generated text — topic, location, listener name, a one-line summary — goes to
+Claude through tool calling, and only for messages worth the cost. Low-confidence
+decisions surface to the producer as "review" instead of being decided silently.
+
+Full sketch in `examples/radio_chat.py`.
+
+---
+
+### 22. Agent skill selection
+
+**Added 2026-09-22.** Source published Sep 20, 2026 —
+[safzanpirani/pi-jev-skill-picker](https://github.com/safzanpirani/pi-jev-skill-picker).
+
+**The problem.** Coding agents load *every* skill description into the system prompt on
+*every* turn — on a 137-skill Pi catalog that's ~19,000 tokens, 87% of the prompt,
+resent on every request.
+
+**How Jev fits.** Ask Jev which skills the current task needs (`skill_search`), then
+load only those into context. The repo measured the payoff against two models:
+stripping the catalog saves 87.9% of the skill block on `gpt-6-astra` (21,074 →
+2,541 tokens) and 84.6% on `deepseek-v4.1-flash` — while one `skill_search` call costs
+~38,600 Jev input tokens, about $0.0016 at $42 per billion, under 1% of what a single
+un-stripped request wastes (reported).
+
+---
+
+### 23. Abstention-gated issue triage
+
+**Added 2026-09-22.** Source published Sep 20, 2026 —
+[emreozyoruk/hush](https://github.com/emreozyoruk/hush).
+
+**The problem.** Issue-triage bots label with the confidence of a coin flip — and the
+annoying ones are the bots that label when they shouldn't.
+
+**How Jev fits.** A GitHub Action asks four calibrated questions per issue or PR —
+bug? duplicate? spam? needs info? — and applies a label only when the answer clears a
+per-question probability threshold, at 202–530 ms per issue in real output
+(reported). When it isn't sure, it stays quiet and says why: on its own first issue,
+a plausible bug-vs-docs report landed at bug 72% / confidence 63% — below the 80% /
+60% gates — so it applied nothing (reported).
+
+Full sketch in `examples/issue_triage.py`.
+
+---
+
+### 24. Personal social-feed filtering
+
+**Added 2026-09-22.** Source published Sep 19, 2026 —
+[bohutang/sift](https://github.com/bohutang/sift).
+
+**The problem.** Feed reading is triage: every post gets a glance and a keep/skip
+decision that never deserved a full LLM call.
+
+**How Jev fits.** A Chrome extension asks Jev to label every post on the X timeline —
+five categories (Substance · Humor · Chit-chat · Promo · Junk) plus AI-written and
+off-topic flags — and collapses the ones you don't want, at about $0.00003 per post
+(reported). Replies are judged in the context of the post they answer, and hidden
+posts fold into single summary lines instead of being deleted. Rule-based siblings
+(AnyFilter, Sharp) take the same approach with user-described rules, reported in the
+[Jev in production tracker](https://iambraun.com/jevreports/shipped/) (Sep 20–21,
+2026).
+
+---
+
+### 25. Gating optional LLM steps
+
+**Added 2026-09-22.** Source published Sep 21, 2026 —
+[sypsyp97/light-whisper](https://github.com/sypsyp97/light-whisper).
+
+**The problem.** Dictation apps run an expensive AI polish pass on every utterance,
+even when the transcript is already clean.
+
+**How Jev fits.** Off / On / Auto: in Auto mode Jev decides whether the polish step is
+needed at all — and missing credentials, timeouts, and uncertain answers all fall
+back to the usual processing path, so the gate can never make things worse
+(reported). A second background Jev check reviews AI-learned correction rules and
+flags possible meaning changes after polishing, without ever replacing or delaying
+the output.
+
+---
+
+### 26. Semantic form autofill
+
+**Added 2026-09-22.** Source published Sep 20, 2026 —
+[imohitmayank/jevfill](https://github.com/imohitmayank/jevfill).
+
+**The problem.** Password managers fill structured profiles; the free-form personal
+notes where your actual details live are useless for autofill.
+
+**How Jev fits.** A Chrome extension sends each visible form field plus your saved
+notes to Jev, which returns per-field line choices with calibrated matching; extension
+code fills the values and highlights them. Password and payment fields are never
+sent or filled, by design. An independent catalog review (Sep 21, 2026) source-inspected
+it: posts to `api.typesafe.ai/v1/systemone` with `jev-1.13.0`, offline unit tests 7/7
+passing (reported via
+[AppitStudio's catalog entry](https://github.com/AppitStudio/awesome-jev/blob/main/community/projects/apps/jevfill.md)).
+
+---
+
+### 27. API breaking-change detection
+
+**Added 2026-09-22.** Source published Sep 20, 2026 —
+[ShuhanSun/jev-oas-sentinel](https://github.com/ShuhanSun/jev-oas-sentinel).
+
+**The problem.** OpenAPI diffs catch shape changes; the behavioral breaks that anger
+consumers — changed defaults, pagination semantics, auth/error semantics, example
+drift — hide in prose.
+
+**How Jev fits.** A Python CLI pairs deterministic structural checks with bounded Jev
+semantic questions about changed contract meaning (change kind, dimension, migration
+burden); plain policy code maps the probabilities to pass / review / block, advisory
+mode by default. Jev never rewrites the spec, and remote `$ref`s are rejected for
+safety. An independent catalog review (Sep 21, 2026) verified the Jev call path and
+the API model (reported via
+[AppitStudio's catalog entry](https://github.com/AppitStudio/awesome-jev/blob/main/community/projects/tools/jev-oas-sentinel.md)).
+
+---
+
+### 28. Production decision primitive — model-tier routing
+
+**Added 2026-09-22.** Source published Sep 22, 2026 —
+[juspay/neurolink](https://github.com/juspay/neurolink).
+
+**The problem.** Multi-model SDKs need a per-request "which model is good enough?"
+answer — without spending a frontier-model call to get it.
+
+**How Jev fits.** NeuroLink's classifier router has a `jev` strategy: one
+decision-model round trip answers difficulty, required capabilities, risk, *and* the
+model pick simultaneously, each with a calibrated confidence — and the degradation
+contract is explicit: if the Jev call fails, times out, or returns a malformed
+answer, it falls back to the heuristic path, so adding a key can only improve routing
+(reported). The SDK is extracted from Juspay's production systems, where the company
+says it powers its AI workloads ([neurolink.ink](https://neurolink.ink)).
 
 ---
 
