@@ -10,7 +10,7 @@ costs, and where the vendor claims don't hold up. Written to answer one question
 unreproduced. Anything tagged **(reported)** is a community self-report from launch week, not an
 independent benchmark. The [Reality check](#6-reality-check) section puts both side by side.
 
-Not affiliated with TypeSafe AI. Last updated: September 23, 2026.
+Not affiliated with TypeSafe AI. Last updated: September 24, 2026.
 
 ## Contents
 
@@ -227,11 +227,16 @@ cheaper and 6× faster than the author's prior LLM pipeline — surveyed in
 [this Sep 20, 2026 finance-projects roundup](https://gist.github.com/drillan/6916b16e8ea31a8ec36c8f59d6483150)
 (reported).
 
-**New signal — added 2026-09-22.** Formanator (98 stars) analyzes receipts and
-auto-fills benefit-claim forms using Jev as a cheaper alternative to an LLM
-classifier (reported in the
-[Jev in production tracker](https://iambraun.com/jevreports/shipped/), Sep 21, 2026;
-no cost numbers published yet).
+**New signal — added 2026-09-24.** Source published Sep 22, 2026 —
+[DocJev by Jerry Liu (LlamaIndex founder)](https://madewithjev.com/builds/docjev)
+([source](https://github.com/jerryjliu/docjev)): an OSS library that classifies **and
+splits** complex document packets — plain-language category rules in, either the
+document's category or the boundaries between sub-documents inside a packet out.
+Liu measured it at **6x faster than gpt-5.6-luna at equivalent accuracy**, and the
+repo documents the OCR-backend tradeoff explicitly: liteparse (free, OSS) wins where the
+document is already digital, LlamaParse (VLM route) wins on complex pages where the
+digitized representation is cached and reused downstream (reported; 400+ GitHub stars
+in ~2 days). See `examples/doc_packet_split.py` for the boundary-detection sketch.
 
 ---
 
@@ -1044,6 +1049,15 @@ Sep 19, 2026: their clone scored 0.697 vs Jev's 0.727). Treat these as third-par
 measurements rather than vendor claims — and note every suite is
 decision/classification-shaped, which is exactly Jev's home turf.
 
+**Independent benchmark kit — added 2026-09-24.** Source published Sep 22, 2026 —
+[Daniele Teti's JevBench/JevTriage](https://www.danieleteti.it/post/jev-typesafe-delphi-benchmark-en/):
+a Delphi implementation of a triage app plus a benchmark harness (`JevBench`), with the
+English and Italian datasets, full CSV results, and methodology published as a
+downloadable zip. The English run made 1,890 calls per language pair, took about an
+hour, and cost ~$3.50 (~$0.90 for the Italian run at 945 calls); the harness pins
+`typesafe/jev-1.13`, not the `jev-latest` alias, because tuned confidence thresholds
+are version-specific (reported; methodology included, so anyone can rerun it).
+
 **Why the gap?** A speed-up means little until you know the baseline. Replacing a long
 reasoning call with a short classification call is a different comparison from replacing
 a small model already configured to return one short answer. The practical comparison is
@@ -1139,3 +1153,7 @@ Community builds added Sep 20–21, 2026 (self-reported): `RiskAverseTech/toolga
 (tool-call firewall), `Bentlybro/siftr` (semantic code search, SWE-bench Lite
 measurements), `m0rphtail/triagedy` (alert triage), `edgelabs-ai/jev48` (independent
 benchmark rows across six public suites).
+
+- Daniele Teti — JevTriage/JevBench in Delphi (Sep 22, 2026; independent benchmark
+  kit with downloadable datasets and CSVs) —
+  https://www.danieleteti.it/post/jev-typesafe-delphi-benchmark-en/
