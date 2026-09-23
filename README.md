@@ -10,14 +10,14 @@ costs, and where the vendor claims don't hold up. Written to answer one question
 unreproduced. Anything tagged **(reported)** is a community self-report from launch week, not an
 independent benchmark. The [Reality check](#6-reality-check) section puts both side by side.
 
-Not affiliated with TypeSafe AI. Last updated: September 22, 2026.
+Not affiliated with TypeSafe AI. Last updated: September 23, 2026.
 
 ## Contents
 
 1. [What Jev is](#1-what-jev-is)
 2. [How it works — the three primitives](#2-how-it-works--the-three-primitives)
 3. [Five patterns worth stealing](#3-five-patterns-worth-stealing)
-4. [Use-case catalog](#4-use-case-catalog) — 28 use cases with code sketches
+4. [Use-case catalog](#4-use-case-catalog) — 31 use cases with code sketches
 5. [Cost math](#5-cost-math)
 6. [Reality check](#6-reality-check)
 7. [When NOT to use Jev](#7-when-not-to-use-jev)
@@ -141,7 +141,7 @@ compute exactly; avoid hiding several judgments inside one question.*
 
 ## 4. Use-case catalog
 
-Twenty-eight use cases, ordered roughly by how much real-world evidence exists. Every code sketch
+Thirty-one use cases, ordered roughly by how much real-world evidence exists. Every code sketch
 follows the SDK pattern from Section 2. The original twelve were added 2026-09-19 from
 launch-week coverage (sources published Sep 15–19, 2026); entries added later carry their own
 add date and source publish date.
@@ -307,6 +307,8 @@ ChatGPT Luna 5.6 for command safety checks with improved classification accuracy
 browser action from page candidates — claims 41/42 tasks passed at 71x lower cost than
 Browser Use in the maintainer's own benchmark (reported in the
 [Jev in production tracker](https://iambraun.com/jevreports/shipped/), Sep 21, 2026).
+
+**New signal — added 2026-09-23.** The open [WindTunnel browser-agent benchmark](https://webmcp.com/benchmark) (changelog v1.2, published Sep 18, 2026) ranked Jev + Mercury 2.5 first of 21 configurations: **49/49 tasks solved**, final score 96.5, median $0.0011 and 3.2 s per task — against Jev driving raw DOM controls (25/49 tasks, $0.0008/task) and GPT-6 Astra with code execution ($0.1187/task) or screenshot-based computer use ($0.2608/task). The winning pattern splits the work: Jev picks the tool, a small fast model (Mercury 2.5) fills the arguments — the benchmark author summarized it as roughly 112× lower model cost than Astra with code execution and 245× lower than screenshot computer use (reported; full post quoted on [madewithjev.com](https://madewithjev.com/)).
 
 **Sketch** — the cascade in `examples/agent_router.py`:
 
@@ -887,6 +889,84 @@ contract is explicit: if the Jev call fails, times out, or returns a malformed
 answer, it falls back to the heuristic path, so adding a key can only improve routing
 (reported). The SDK is extracted from Juspay's production systems, where the company
 says it powers its AI workloads ([neurolink.ink](https://neurolink.ink)).
+
+---
+
+### 29. Semantic search over item catalogs
+
+**Added 2026-09-23.** Source published Sep 21, 2026 —
+[Aayan-DEV/aayans-yc-indexor](https://github.com/Aayan-DEV/aayans-yc-indexor)
+(X post by @aaayandev, quoted with date on
+[madewithjev.com/builds/yc-indexor](https://madewithjev.com/builds/yc-indexor)).
+
+**The problem.** Keyword search can't express intent ("dev-tools startup with a blue
+logo"), and re-ranking thousands of candidates with a generative LLM is too slow and
+expensive for interactive search.
+
+**How Jev fits.** Retrieve-then-rerank: cheap vector math (meaning, logo looks, OCR'd
+logo text, taxonomy tags) narrows 6,241 YC companies to at most 320 finalists; Jev then
+scores every finalist in one parallel request and returns a calibrated probability per
+item — real percentages, about 1 s and ~$0.002 per search (reported). Jev also
+re-applied YC's 337 taxonomy tags to every company because the official tagging was
+patchy; the author put total testing at 90M tokens and $2.70 (reported). Full sketch in
+`examples/semantic_search.py`.
+
+---
+
+### 30. Bulk creative/content scoring
+
+**Added 2026-09-23.** Source published Sep 17, 2026 — X post by Matthew Berman
+(@TheMattBerman), quoted with date in
+[this Sep 2026 use-case roundup](https://www.scriptbyai.com/jev-use-cases/).
+
+**The problem.** Creative and competitive-intelligence teams need to evaluate large
+corpora of existing content (ads, posts, pages) on many axes — hook, format, offer,
+CTA — work that currently means hand-sampling a few items or paying an LLM to write
+paragraphs about each one.
+
+**How Jev fits.** Batch `Score`/`Choice` per item (Pattern 1), aggregate in code: the
+post reported breaking down **724 live ads from 37 brands in 40 s for $0.09 in
+tokens** — every hook, format, offer, CTA, awareness stage, and landing-page mismatch
+(reported).
+
+**Sketch.**
+
+```python
+axes = {
+    "hook": Choice("Hook archetype", {"scarcity": "...", "social_proof": "...",
+                                      "curiosity": "...", "other": "..."}),
+    "offer": Choice("Offer type", {"discount": "...", "trial": "...", "none": "..."}),
+    "cta_strength": Score("CTA strength", ["Absent", "Weak", "Clear", "Compelling"]),
+    "landing_mismatch": Noul("Ad promises something the landing page doesn't deliver"),
+}
+for ad in ads:  # one call per ad, all questions asked in parallel
+    r = client.system_one(
+        state={"ad_text": ad.text, "landing_text": ad.landing_page_text},
+        questions=axes,
+    )
+    store(ad.id, r.answers)  # numbers in, numbers out — nothing to parse
+```
+
+Separately, Ian Nuttall reported running 8 questions over 3,282 of his X posts —
+4,252,330 tokens, $0.1282, 8m 34s total — to find which topics, hooks, and tones drove
+growth (reported; same Sep 17, 2026 roundup).
+
+---
+
+### 31. Website/page quality scoring
+
+**Added 2026-09-23.** Source published Sep 19, 2026 —
+[AI slop detector](https://madewithjev.com/builds/ai-slop-detector) by Jon Kraayenbrink
+(@kraayenJon), a free live tool.
+
+**The problem.** "Is this page AI-generated slop?" is a judgment call currently made by
+gut feel or by an LLM writing a paragraph about it — too slow and expensive to run on
+every page you visit.
+
+**How Jev fits.** One call checks a page against 35 written "tells" (purple gradients,
+emoji headers, "seamlessly", fake testimonials, bento grids...) — **243 ms and
+$0.00015 per check** (reported) — and returns a single slop score. Same batch-question
+pattern as use case 30, pointed at page quality instead of marketing creative.
 
 ---
 
