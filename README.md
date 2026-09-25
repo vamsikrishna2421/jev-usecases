@@ -10,7 +10,7 @@ costs, and where the vendor claims don't hold up. Written to answer one question
 unreproduced. Anything tagged **(reported)** is a community self-report from launch week, not an
 independent benchmark. The [Reality check](#6-reality-check) section puts both side by side.
 
-Not affiliated with TypeSafe AI. Last updated: September 24, 2026.
+Not affiliated with TypeSafe AI. Last updated: September 25, 2026.
 
 ## Contents
 
@@ -168,6 +168,15 @@ cheaper** — and Jev was "the only one that hands back a real probability which
 ideal for automating workflows" (reported via
 [TechCrunch, Sep 18, 2026](https://techcrunch.com/2026/09/18/a-new-kind-of-ai-model-from-a-chatgpt-inventor-is-thrilling-developers/)).
 
+**New signal — added 2026-09-25.** Source published ~Sep 17, 2026 — a developer ran
+Jev zero-shot over **18,514 spam emails: 98.3% accuracy vs 98.4%** for a TF-IDF
+logistic regression trained on ~14,800 labeled emails (a statistical tie — Jev's
+criteria were refined once, after reviewing 1,000 labeled emails). The confidence
+scores were usable for human-review routing: scores under 0.1 were 0.1% spam, 0.9+
+were 99.9% spam, and sending the uncertain 4.6% (scores 0.3–0.7) to a person left
+the rest at **99.5%** accuracy (reported via
+[Arize AI](https://arize.com/blog/typesafe-jev-llm-judge/)).
+
 **Sketch.**
 
 ```python
@@ -253,6 +262,13 @@ below. Parallel questions mean one call covers the whole policy list.
 for $0.20, and skipping sponsor segments at $0.005 per video (reported). DataCamp notes
 TypeSafe's pitch of scoring all 50M reviews in a product table for ~$20 in decision calls
 (vendor).
+
+**New signal — added 2026-09-25.** Source published ~Sep 17, 2026 — UK events site
+[NearHere](https://nearhere.events) tested Jev on event-listing moderation:
+**96% accuracy vs 86% for Gemini Flash-Lite, 58× cheaper per decision** — a real
+company replacing a small LLM with Jev on its moderation path, and beating it on
+accuracy while paying less (reported via
+[Arize AI](https://arize.com/blog/typesafe-jev-llm-judge/)).
 
 ---
 
@@ -1057,6 +1073,51 @@ downloadable zip. The English run made 1,890 calls per language pair, took about
 hour, and cost ~$3.50 (~$0.90 for the Italian run at 945 calls); the harness pins
 `typesafe/jev-1.13`, not the `jev-latest` alias, because tuned confidence thresholds
 are version-specific (reported; methodology included, so anyone can rerun it).
+
+**Third-party judge-cost rows — added 2026-09-25.** Source published ~Sep 17, 2026 —
+[Arize AI](https://arize.com/blog/typesafe-jev-llm-judge/) ("TypeSafe Jev: Can
+Decision Models Replace LLM Judges?") collected three early independent
+measurements of Jev as an LLM judge (small samples, early data — their words):
+
+| Test | Result |
+|---|---|
+| Every's head of evals | **777 judgments in under 0.7 s for ~$0.0025** |
+| NearHere (UK events site), listing moderation | **96% Jev vs 86% Gemini Flash-Lite, 58× cheaper per decision** |
+| Spam eval, 18,514 emails, Jev zero-shot | **98.3% vs 98.4%** for a TF-IDF logistic regression trained on ~14,800 labeled emails — a statistical tie, with Jev's criteria refined once from 1,000 labeled emails |
+
+The same piece documents what replacing an LLM judge loses (the written
+explanation — Jev returns a category and probabilities, nothing else), recommends
+running Jev over every trace for coverage and re-running failures through an LLM
+judge for the directional signal, and calls the "can't hallucinate" claim an
+overreach: it is a schema guarantee, not correctness. Arize says it will run its
+own benchmarks — one of the eval shops to watch.
+
+**Four independent Banking77 scores disagree by 10.7 points — added 2026-09-25.**
+Source published Sep 24, 2026 —
+[Creative AI News](https://www.creativeainews.com/articles/open-jev-clones-benchmark-disagreement-2026/):
+four independent evaluations of the same model on the same 77-label public
+benchmark: **87.0%** (Convai Innovations' comparison table, n not stated),
+**83.2%** (ickma2311 pre-registered eval, n=208 paired, hash-pinned),
+**77.8%** (FirasSX914's calibre, 500 decisions, $0.0507), **76.3%** (nibzard,
+frozen protocol, raw logs published). The most rigorous entries are the two
+lowest. Related findings from the same wave: latency p50 agrees across evaluators
+(236–276 ms); Jev's expected calibration error was the worst in the nibzard field
+(**0.246** vs 0.039–0.122 for the LLMs), and it declined forced-uncertainty items
+only 49.7% of the time vs 97.3–100% for the LLMs; a **supervised 2023-era encoder
+(bge-small + logistic regression on 10,003 Banking77 train examples) scored
+93.3%** — beating Jev (83.2%) and GPT-5.6 Terra (87.5%). If you have labeled data,
+fit a classifier first; the decision models earn their place on zero-shot tasks
+and on latency ($0.07 per 1,000 decisions vs $0.19 for the cheapest LLM in the
+same independent test).
+
+**Measured bill, Jev vs frontier LLMs — added 2026-09-25.** Source published
+Sep 21, 2026 —
+[Jock's Reflex benchmark](https://thoughts.jock.pl/p/jev-typesafe-system-one-model-benchmark-2026)
+(replays a run captured Sep 21): a stream of support tickets classified by Jev
+raced against the same tickets on frontier models. **49 Jev calls cost $0.00095;
+51 calls to Gemini, Haiku and Fable cost $0.161** — the Jev lane was 0.6% of the
+comparison bill, measured on the same afternoon, no modeling or smoothing.
+Every latency and price on the page is measured.
 
 **Why the gap?** A speed-up means little until you know the baseline. Replacing a long
 reasoning call with a short classification call is a different comparison from replacing
